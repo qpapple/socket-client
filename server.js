@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -41,6 +40,12 @@ io.on('connection', (socket) => {
                 segments: room.segments,
             });
         }
+
+        // ✅ 입장 시 기존 채팅 히스토리 보내기
+        if (room?.chat && room.chat.length > 0) {
+            socket.emit('chatHistory', room.chat);
+            console.log(`📜 채팅 히스토리 전송: room=${roomId}, messages=${room.chat.length}`);
+        }
     });
 
     // ✅ 룰렛 회전 요청 (방장 → 서버 → 전체)
@@ -55,12 +60,12 @@ io.on('connection', (socket) => {
 
         // 최신 상태 저장
         roomState[roomId] = {
+            ...roomState[roomId],
             segments,
             result,
             resultIndex,
         };
 
-        // 전체 룸에 spin 브로드캐스트
         io.to(roomId).emit('spinRoulette', {
             result,
             resultIndex,
@@ -70,7 +75,7 @@ io.on('connection', (socket) => {
         console.log(`🎯 룰렛 스핀 전송: room=${roomId}, result="${result}" (index=${resultIndex})`);
     });
 
-    // ✅ segments만 동기화 (메뉴 셋팅/추가/제거 등)
+    // ✅ segments 동기화
     socket.on('syncSegments', ({ roomId, segments }) => {
         if (!roomId || !Array.isArray(segments)) return;
 
@@ -81,6 +86,35 @@ io.on('connection', (socket) => {
 
         io.to(roomId).emit('syncSegments', segments);
         console.log(`🔄 세그먼트 동기화: room=${roomId}, items=${segments.length}`);
+    });
+
+    // ✅ 채팅 메시지 수신 → 저장 후 브로드캐스트
+    socket.on('chatMessage', ({ roomId, user, text }) => {
+        if (!roomId || !text || !user) return;
+
+        const message = {
+            user,
+            text,
+            time: new Date().toISOString(),
+        };
+
+        // 채팅 저장
+        if (!roomState[roomId]) {
+            roomState[roomId] = {};
+        }
+        if (!roomState[roomId].chat) {
+            roomState[roomId].chat = [];
+        }
+        roomState[roomId].chat.push(message);
+
+        // 최근 100개만 유지
+        if (roomState[roomId].chat.length > 100) {
+            roomState[roomId].chat = roomState[roomId].chat.slice(-100);
+        }
+
+        // 브로드캐스트
+        io.to(roomId).emit('chatMessage', message);
+        console.log(`💬 채팅 전송: room=${roomId}, ${user}: ${text}`);
     });
 });
 
