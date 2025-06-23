@@ -25,6 +25,14 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         console.log(`${socket.id} joined room: ${roomId}`);
 
+        // ✅ 방 상태 초기화 보장
+        if (!roomState[roomId]) {
+            roomState[roomId] = {
+                segments: [],
+                chat: [],
+            };
+        }
+
         const room = roomState[roomId];
 
         // 세그먼트 보내기
