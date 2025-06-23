@@ -22,6 +22,7 @@ io.on('connection', (socket) => {
 
     // ✅ 방 입장
     socket.on('joinRoom', ({ roomId }) => {
+        if (!roomId) return;
         socket.join(roomId);
         console.log(`${socket.id} joined room: ${roomId}`);
 
